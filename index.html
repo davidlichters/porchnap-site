@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PorchNap</title>
+<link rel="preload" as="image" href="bild.jpg">
+<style>
+  html, body { margin: 0; height: 100%; background: #fff; }
+  body { display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; }
+  /* Volle Höhe; passt das nicht, volle Breite. Nie abgeschnitten, nie verzerrt. */
+  img, video { display: block; width: 100vw; height: 100vh; height: 100dvh; object-fit: contain; background: #fff; user-select: none; -webkit-user-drag: none; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<img id="bild" src="knopf.jpg" alt="Do not press">
+<video id="ablehnen" src="ablehnen.mp4" preload="auto" playsinline webkit-playsinline hidden></video>
+<video id="annehmen" src="annehmen.mp4" preload="auto" playsinline webkit-playsinline hidden></video>
+<audio id="ton" src="ton.m4a" preload="auto"></audio>
+<script>
+  // Ablauf:
+  // 1. Knopf. Erster Klick, Tipp oder Tastendruck irgendwo: John Porch ruft an, Klingelton.
+  // 2. Anruf. Klick auf die linke Hälfte (Decline): ablehnen.mp4. Rechte Hälfte (Accept): annehmen.mp4.
+  // 3. Video läuft. Am Ende zurück zum Knopf.
+  const bild = document.getElementById('bild');
+  const ton = document.getElementById('ton');
+  const videos = { links: document.getElementById('ablehnen'), rechts: document.getElementById('annehmen') };
+
+  let zustand = 'knopf';
+  // Jede Berührung und jeder Tastendruck ist eine Geste. Der Klick, der den Anruf
+  // auslöst, darf nicht gleich noch als Klick auf Decline oder Accept zählen.
+  let geste = 0, wechselGeste = -1, tonGestartet = false;
+  addEventListener('pointerdown', () => { geste++; }, true);
+  addEventListener('keydown', e => { if (!e.repeat) geste++; }, true);
+
+  // Browser erlauben Ton nur nach bestimmten Gesten (auf dem Handy erst beim Loslassen),
+  // deshalb wird der Klingelton bei jedem Ereignis der auslösenden Geste versucht.
+  function anruf() {
+    if (zustand === 'knopf') {
+      zustand = 'anruf';
+      wechselGeste = geste;
+      bild.src = 'bild.jpg';
+      bild.alt = 'John Porch is calling';
+    }
+    if (zustand === 'anruf' && geste === wechselGeste && !tonGestartet) {
+      ton.play().then(() => { tonGestartet = true; }).catch(() => {});
+    }
+  }
+  ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(t => addEventListener(t, anruf));
+
+  addEventListener('click', e => {
+    if (zustand !== 'anruf' || geste === wechselGeste) return;
+    // Das Bild steht mittig, also ist die Mitte des Bildes die Mitte der Seite.
+    abspielen(e.clientX < innerWidth / 2 ? videos.links : videos.rechts);
+  });
+
+  function abspielen(video) {
+    zustand = 'video';
+    ton.pause();
+    ton.currentTime = 0;
+    bild.hidden = true;
+    video.hidden = false;
+    video.currentTime = 0;
+    video.play().catch(() => { video.controls = true; });
+  }
+
+  function zurueck() {
+    Object.values(videos).forEach(v => { v.pause(); v.hidden = true; v.controls = false; });
+    bild.src = 'knopf.jpg';
+    bild.alt = 'Do not press';
+    bild.hidden = false;
+    tonGestartet = false;
+    zustand = 'knopf';
+  }
+  Object.values(videos).forEach(v => v.addEventListener('ended', zurueck));
+</script>
+</body>
+</html>
